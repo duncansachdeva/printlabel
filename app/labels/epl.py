@@ -38,11 +38,11 @@ def build_epl_label(
         text_xy_mul = (1, 1)
         narrow = 2
         wide = 4
-        barcode_height = 60
-        title_y = 8
-        item_y = 40
-        case_y = 66
-        barcode_y = 88
+        barcode_height = 40
+        title_y = 4
+        item_y = 28
+        case_y = 48
+        barcode_y = 68
         x_margin = 20
         hri = "B"
     else:
@@ -84,8 +84,8 @@ def build_epl_label(
     lines.append(_e(f"A{x_margin},{item_y},0,{text_font},{text_xy_mul[0]},{text_xy_mul[1]},N,\"Item: {safe_item}\""))
     lines.append(_e(f"A{x_margin},{case_y},0,{text_font},{text_xy_mul[0]},{text_xy_mul[1]},N,\"Casepack: {safe_case}\""))
 
-    # UPC-A barcode: 'U' type, HRI below, no quotes in data
-    lines.append(_e(f"B{x_margin},{barcode_y},0,U,{narrow},{wide},{barcode_height},{hri},{upc_payload}"))
+    # Code 128 (1) with no rotation (0) and human readable below
+    lines.append(_e(f"B{x_margin},{barcode_y},0,1,{narrow},{wide},{barcode_height},{hri},\"{upc_payload}\""))
 
     if copies and copies > 1:
         lines.append(_e(f"P{copies}"))
