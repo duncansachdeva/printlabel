@@ -172,8 +172,8 @@ class PrintLabelApp(tk.Tk):
         casepack = sanitize_text(self.txt_case.get().strip(), 32)
 
         upc_raw = self.txt_upc.get().strip()
-        upc12 = ensure_upc12(upc_raw)
-        if not upc12:
+        upc12 = ensure_upc12(upc_raw) if upc_raw else ""
+        if upc_raw and not upc12:
             messagebox.showwarning("UPC", "UPC must be 11 or 12 digits with a valid check digit.")
             return
 
