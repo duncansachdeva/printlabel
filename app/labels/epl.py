@@ -36,8 +36,8 @@ def build_epl_label(
         title_xy_mul = (1, 1)
         text_font = 3
         text_xy_mul = (1, 1)
-        narrow = 2
-        wide = 4
+        narrow = 3
+        wide = 6
         barcode_height = 40
         title_y = 4
         item_y = 28
@@ -50,8 +50,8 @@ def build_epl_label(
         title_xy_mul = (1, 1)
         text_font = 3
         text_xy_mul = (1, 1)
-        narrow = 2
-        wide = 4
+        narrow = 3
+        wide = 6
         barcode_height = 280
         title_y = 40
         item_y = 110
@@ -81,8 +81,8 @@ def build_epl_label(
 
     # Title / fields
     lines.append(_e(f"A{x_margin},{title_y},0,{title_font},{title_xy_mul[0]},{title_xy_mul[1]},N,\"{safe_title}\""))
-    lines.append(_e(f"A{x_margin},{item_y},0,{text_font},{text_xy_mul[0]},{text_xy_mul[1]},N,\"Item: {safe_item}\""))
-    lines.append(_e(f"A{x_margin},{case_y},0,{text_font},{text_xy_mul[0]},{text_xy_mul[1]},N,\"Casepack: {safe_case}\""))
+    lines.append(_e(f"A{x_margin},{item_y},0,{text_font},{text_xy_mul[0]},{text_xy_mul[1]},N,\"{safe_item}\""))
+    lines.append(_e(f"A{x_margin},{case_y},0,{text_font},{text_xy_mul[0]},{text_xy_mul[1]},N,\"CS/PK: {safe_case}\""))
 
     # Code 128 (1) with no rotation (0) and human readable below
     lines.append(_e(f"B{x_margin},{barcode_y},0,1,{narrow},{wide},{barcode_height},{hri},\"{upc_payload}\""))

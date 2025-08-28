@@ -58,8 +58,8 @@ def render_label_preview(
 
     # Text
     draw.text((x_margin, title_y), title or "", fill=0, font=title_font)
-    draw.text((x_margin, item_y), f"Item: {item_number or ''}", fill=0, font=text_font)
-    draw.text((x_margin, case_y), f"Casepack: {casepack or ''}", fill=0, font=text_font)
+    draw.text((x_margin, item_y), item_number or "", fill=0, font=text_font)
+    draw.text((x_margin, case_y), f"CS/PK: {casepack or ''}", fill=0, font=text_font)
 
     # Barcode
     if HAS_BARCODE and upc12 and upc12.isdigit() and len(upc12) == 12:
@@ -72,9 +72,9 @@ def render_label_preview(
             payload11 = upc12[:-1]
             bc = cls(payload11, writer=ImageWriter())
             bc_img = bc.render(writer_options={
-                "module_width": 0.5,
+                "module_width": 0.8,
                 "module_height": barcode_height,
-                "quiet_zone": 2.0,
+                "quiet_zone": 1.0,
                 "write_text": True,
                 "font_size": font_size,
                 "text_distance": 2,
