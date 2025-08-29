@@ -61,7 +61,7 @@ def render_label_preview(
 
     # Layout heuristics similar to builders
     if height_dots <= 203:  # ~2x1
-        title_font = _load_font(32)  # Larger title
+        title_font = _load_font(24)  # Smaller, narrower title
         text_font = _load_font(22)
         title_y = 10
         item_y = 44
@@ -71,7 +71,7 @@ def render_label_preview(
         barcode_height = 60
         font_size = 14
     else:
-        title_font = _load_font(44)
+        title_font = _load_font(36)  # Smaller, narrower title
         text_font = _load_font(32)
         title_y = 40
         item_y = 110
@@ -82,26 +82,26 @@ def render_label_preview(
         font_size = 20
 
     # Text with multi-line title support
-    title_lines = wrap_text(title or "", 36)
+    title_lines = wrap_text(title or "", 60)  # Increased for narrower font
     for i, title_line in enumerate(title_lines):
         y_pos = title_y + (i * 24)
         draw.text((x_margin, y_pos), title_line, fill=0, font=title_font)
     
-    # Add separator line after title
+    # Add separator line after title (moved down further to avoid underlining text)
     if title_lines and title_lines[0]:
-        separator_y = title_y + (len(title_lines) * 24) + 8
+        separator_y = title_y + (len(title_lines) * 24) + 24
         draw.line([(x_margin, separator_y), (x_margin + 200, separator_y)], fill=0, width=2)
     
     # Adjust positions for multi-line title
     item_y_adjusted = item_y + (len(title_lines) - 1) * 24
     if title_lines and title_lines[0]:
-        item_y_adjusted += 16  # Extra space after separator
+        item_y_adjusted += 24  # Extra space after separator
     draw.text((x_margin, item_y_adjusted), item_number or "", fill=0, font=text_font)
     
     if casepack:
         case_y_adjusted = case_y + (len(title_lines) - 1) * 24
         if title_lines and title_lines[0]:
-            case_y_adjusted += 16  # Extra space after separator
+            case_y_adjusted += 24  # Extra space after separator
         draw.text((x_margin, case_y_adjusted), f"CS/PK: {casepack}", fill=0, font=text_font)
 
     # Barcode (only if UPC provided)
@@ -130,7 +130,7 @@ def render_label_preview(
                 bc_img = bc_img.resize(new_size)
             barcode_y_adjusted = barcode_y + (len(title_lines) - 1) * 24
             if title_lines and title_lines[0]:
-                barcode_y_adjusted += 16  # Extra space after separator
+                barcode_y_adjusted += 24  # Extra space after separator
             img.paste(bc_img.convert("L"), (x_margin, barcode_y_adjusted))
         except Exception:
             logging.warning("Failed to render preview barcode", exc_info=True)
@@ -138,7 +138,7 @@ def render_label_preview(
         if upc12 and upc12.strip():  # Only show message if UPC was entered but invalid
             barcode_y_adjusted = barcode_y + (len(title_lines) - 1) * 24
             if title_lines and title_lines[0]:
-                barcode_y_adjusted += 16  # Extra space after separator
+                barcode_y_adjusted += 24  # Extra space after separator
             draw.text((x_margin, barcode_y_adjusted), "UPC preview unavailable", fill=0, font=_load_font(16))
 
     return img

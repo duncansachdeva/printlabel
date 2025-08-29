@@ -12,6 +12,7 @@ from app.labels.epl import build_epl_label
 from app.labels.sizes import LABEL_SIZES_DOTS
 from app.utils.validation import ensure_upc12, sanitize_text
 from app.utils.preview import render_label_preview, image_to_tk
+from app.utils.database import LabelDatabase
 
 
 def setup_logging() -> None:
@@ -27,16 +28,18 @@ class PrintLabelApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("PrintLabel")
-        self.geometry("560x700")
+        self.geometry("560x900")
         self.resizable(False, False)
 
         setup_logging()
         logging.info("Application started")
 
         self.preview_image = None
+        self.db = LabelDatabase()
 
         self._build_ui()
         self._load_printers()
+        self._load_saved_settings()
         self._update_preview()
 
     def _build_ui(self) -> None:
@@ -93,6 +96,28 @@ class PrintLabelApp(tk.Tk):
         self.spn_copies.insert(0, "1")
         self.spn_copies.grid(row=4, column=1, sticky="w", padx=6)
 
+        # Saved items frame
+        frm_saved = ttk.LabelFrame(self, text="Saved Items")
+        frm_saved.pack(fill="x", **padding)
+        
+        # Saved items listbox
+        self.lst_saved = tk.Listbox(frm_saved, height=4)
+        self.lst_saved.pack(fill="x", padx=6, pady=4)
+        self.lst_saved.bind("<Double-Button-1>", self._on_item_select)
+        
+        # Saved items buttons
+        frm_saved_buttons = ttk.Frame(frm_saved)
+        frm_saved_buttons.pack(fill="x", padx=6, pady=4)
+        
+        self.btn_save = ttk.Button(frm_saved_buttons, text="Save Current", command=self._save_current_item)
+        self.btn_save.pack(side="left", padx=(0, 6))
+        
+        self.btn_edit = ttk.Button(frm_saved_buttons, text="Edit Selected", command=self._edit_selected_item)
+        self.btn_edit.pack(side="left", padx=(0, 6))
+        
+        self.btn_delete = ttk.Button(frm_saved_buttons, text="Delete Selected", command=self._delete_selected_item)
+        self.btn_delete.pack(side="left")
+
         # Preview area
         frm_preview = ttk.LabelFrame(self, text="Preview")
         frm_preview.pack(fill="both", expand=True, **padding)
@@ -120,6 +145,135 @@ class PrintLabelApp(tk.Tk):
             self.cbo_printers.set(default)
         elif printers:
             self.cbo_printers.set(printers[0])
+
+    def _load_saved_settings(self):
+        """Load saved printer settings and items."""
+        # Load printer settings
+        settings = self.db.get_printer_settings()
+        if settings:
+            if settings["printer_name"] in self.cbo_printers["values"]:
+                self.cbo_printers.set(settings["printer_name"])
+            if settings["language"] in ["Auto", "ZPL", "EPL"]:
+                self.cbo_language.set(settings["language"])
+            if settings["size"] in list(LABEL_SIZES_DOTS.keys()):
+                self.cbo_size.set(settings["size"])
+        
+        # Load saved items
+        self._refresh_saved_items()
+
+    def _refresh_saved_items(self):
+        """Refresh the saved items listbox."""
+        self.lst_saved.delete(0, tk.END)
+        items = self.db.get_saved_items()
+        for item in items:
+            display_text = f"{item['item_number']} - {item['title'][:30]}"
+            self.lst_saved.insert(tk.END, display_text)
+
+    def _save_current_item(self):
+        """Save the current item to database."""
+        item_number = self.txt_item.get().strip()
+        if not item_number:
+            messagebox.showwarning("Save Item", "Please enter an item number to save.")
+            return
+        
+        upc = self.txt_upc.get().strip()
+        title = self.txt_title.get().strip()
+        casepack = self.txt_case.get().strip()
+        
+        if self.db.save_item(item_number, upc, title, casepack):
+            messagebox.showinfo("Save Item", f"Item '{item_number}' saved successfully!")
+            self._refresh_saved_items()
+        else:
+            messagebox.showerror("Save Item", "Failed to save item.")
+
+    def _edit_selected_item(self):
+        """Edit the selected item in database."""
+        selection = self.lst_saved.curselection()
+        if not selection:
+            messagebox.showwarning("Edit Item", "Please select an item to edit.")
+            return
+        
+        items = self.db.get_saved_items()
+        if selection[0] < len(items):
+            item = items[selection[0]]
+            # Load item into form for editing
+            self.txt_item.delete(0, tk.END)
+            self.txt_item.insert(0, item['item_number'])
+            self.txt_upc.delete(0, tk.END)
+            self.txt_upc.insert(0, item['upc'])
+            self.txt_title.delete(0, tk.END)
+            self.txt_title.insert(0, item['title'])
+            self.txt_case.delete(0, tk.END)
+            self.txt_case.insert(0, item['casepack'])
+            self._update_preview()
+            
+            # Change save button to update mode
+            self.btn_save.config(text="Update Item", command=self._update_selected_item)
+            self.btn_save.config(state="normal")
+            
+            # Store the original item number for updating
+            self._editing_item = item['item_number']
+
+    def _update_selected_item(self):
+        """Update the selected item in database."""
+        if not hasattr(self, '_editing_item'):
+            messagebox.showwarning("Update Item", "No item selected for editing.")
+            return
+        
+        item_number = self.txt_item.get().strip()
+        if not item_number:
+            messagebox.showwarning("Update Item", "Please enter an item number.")
+            return
+        
+        upc = self.txt_upc.get().strip()
+        title = self.txt_title.get().strip()
+        casepack = self.txt_case.get().strip()
+        
+        # Delete old item and save new one
+        if self.db.delete_item(self._editing_item) and self.db.save_item(item_number, upc, title, casepack):
+            messagebox.showinfo("Update Item", f"Item updated successfully!")
+            self._refresh_saved_items()
+            # Reset save button
+            self.btn_save.config(text="Save Current", command=self._save_current_item)
+            delattr(self, '_editing_item')
+        else:
+            messagebox.showerror("Update Item", "Failed to update item.")
+
+    def _delete_selected_item(self):
+        """Delete the selected item from database."""
+        selection = self.lst_saved.curselection()
+        if not selection:
+            messagebox.showwarning("Delete Item", "Please select an item to delete.")
+            return
+        
+        items = self.db.get_saved_items()
+        if selection[0] < len(items):
+            item = items[selection[0]]
+            if messagebox.askyesno("Delete Item", f"Delete item '{item['item_number']}'?"):
+                if self.db.delete_item(item['item_number']):
+                    messagebox.showinfo("Delete Item", "Item deleted successfully!")
+                    self._refresh_saved_items()
+                else:
+                    messagebox.showerror("Delete Item", "Failed to delete item.")
+
+    def _on_item_select(self, event):
+        """Load selected item into form fields."""
+        selection = self.lst_saved.curselection()
+        if not selection:
+            return
+        
+        items = self.db.get_saved_items()
+        if selection[0] < len(items):
+            item = items[selection[0]]
+            self.txt_item.delete(0, tk.END)
+            self.txt_item.insert(0, item['item_number'])
+            self.txt_upc.delete(0, tk.END)
+            self.txt_upc.insert(0, item['upc'])
+            self.txt_title.delete(0, tk.END)
+            self.txt_title.insert(0, item['title'])
+            self.txt_case.delete(0, tk.END)
+            self.txt_case.insert(0, item['casepack'])
+            self._update_preview()
 
     def _resolve_language(self, printer_name: str) -> str:
         selected = self.cbo_language.get()
@@ -217,6 +371,9 @@ class PrintLabelApp(tk.Tk):
             logging.info("Sending %s job to %s (%d bytes)", lang, printer_name, len(payload))
             send_raw(printer_name, payload, job_name=f"PrintLabel ({lang})")
             messagebox.showinfo("Printed", f"Sent {copies} label(s) to {printer_name} ({lang}).")
+            
+            # Save printer settings after successful print
+            self.db.save_printer_settings(printer_name, self.cbo_language.get(), self.cbo_size.get())
         except Exception as ex:
             logging.exception("Failed to print")
             messagebox.showerror("Error", f"Failed to print: {ex}")
