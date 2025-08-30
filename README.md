@@ -19,6 +19,19 @@ A simple Windows desktop app to print labels on Zebra printers (e.g., LP2844, ZM
    python -m app.main
    ```
 
+### Running the Executable (Production)
+
+1. **Build the executable:**
+   ```powershell
+   python build_exe.py
+   ```
+
+2. **Run the executable:**
+   - Double-click `dist\PrintLabel.exe`
+   - Or run `run_printlabel.bat`
+
+**Note:** The executable is self-contained and doesn't require Python to be installed on the target machine.
+
 ### Features
 - Select installed Windows printers
 - Auto-detect label language (ZPL/EPL) by printer name, with manual override
@@ -31,8 +44,10 @@ A simple Windows desktop app to print labels on Zebra printers (e.g., LP2844, ZM
 - For LP2844 family, EPL is typically required. For ZM400, ZPL is typical.
 
 ### Packaging (optional)
-If you plan to distribute, consider PyInstaller:
+The project includes a build script for creating a standalone executable:
+
 ```powershell
-pip install pyinstaller
-pyinstaller --noconfirm --windowed --name PrintLabel app/main.py
+python build_exe.py
 ```
+
+This creates `dist\PrintLabel.exe` (approximately 22MB) that can run on any Windows machine without Python installed.

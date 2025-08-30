@@ -1,0 +1,3 @@
+@echo off
+echo Starting PrintLabel...
+start "" "dist\PrintLabel.exe"

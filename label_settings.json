@@ -1,0 +1,28 @@
+{
+  "UPS Thermal 2844_2x1": {
+    "title_font": 4,
+    "text_font": 3,
+    "title_xy_mul_x": 1,
+    "title_xy_mul_y": 2,
+    "x_margin": 20,
+    "title_y": 6,
+    "item_y": 32,
+    "case_y": 52,
+    "barcode_y": 72,
+    "line_spacing": 24,
+    "title_max_chars": 24,
+    "item_max_chars": 36,
+    "case_max_chars": 36,
+    "max_title_lines": 2,
+    "show_separator": true,
+    "separator_width": 200,
+    "separator_thickness": 2,
+    "barcode_height": 40,
+    "barcode_narrow": 3,
+    "barcode_wide": 6,
+    "barcode_hri": "B",
+    "orientation": "normal",
+    "preview_title_font_size": 24,
+    "preview_text_font_size": 22
+  }
+}

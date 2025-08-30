@@ -2,7 +2,7 @@
 
 Renders a raster preview of the label at 203 dpi for display in Tkinter.
 """
-from typing import Tuple
+from typing import Tuple, Optional
 from PIL import Image, ImageDraw, ImageFont
 import io
 import logging
@@ -14,15 +14,21 @@ try:
 except Exception:
     HAS_BARCODE = False
 
+from app.utils.settings import LabelSettings
+
 
 def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
-        return ImageFont.truetype("arial.ttf", size)
+        # Try Arial Narrow first, fallback to Arial, then default
+        try:
+            return ImageFont.truetype("arialn.ttf", size)  # Arial Narrow
+        except Exception:
+            return ImageFont.truetype("arial.ttf", size)  # Regular Arial
     except Exception:
         return ImageFont.load_default()
 
 
-def wrap_text(text: str, max_chars: int) -> list[str]:
+def wrap_text(text: str, max_chars: int, max_lines: int = 2) -> list[str]:
     """Wrap text to multiple lines if needed."""
     if not text:
         return [""]
@@ -44,7 +50,7 @@ def wrap_text(text: str, max_chars: int) -> list[str]:
     if current_line:
         lines.append(current_line)
     
-    return lines[:2]  # Max 2 lines
+    return lines[:max_lines]  # Respect max_lines parameter
 
 
 def render_label_preview(
@@ -55,53 +61,81 @@ def render_label_preview(
     item_number: str,
     casepack: str,
     upc12: str,
+    settings: Optional[LabelSettings] = None,
 ) -> Image.Image:
     img = Image.new("L", (width_dots, height_dots), color=255)
     draw = ImageDraw.Draw(img)
 
-    # Layout heuristics similar to builders
-    if height_dots <= 203:  # ~2x1
-        title_font = _load_font(24)  # Smaller, narrower title
-        text_font = _load_font(22)
-        title_y = 10
-        item_y = 44
-        case_y = 70
-        barcode_y = 92
-        x_margin = 20
-        barcode_height = 60
-        font_size = 14
+    # Use provided settings or defaults
+    if settings:
+        title_font = _load_font(settings.preview_title_font_size)
+        text_font = _load_font(settings.preview_text_font_size)
+        title_y = settings.title_y
+        item_y = settings.item_y
+        case_y = settings.case_y
+        barcode_y = settings.barcode_y
+        x_margin = settings.x_margin
+        barcode_height = settings.barcode_height
+        font_size = 14 if height_dots <= 203 else 20
+        line_spacing = settings.line_spacing
+        title_max_chars = settings.title_max_chars
+        max_title_lines = settings.max_title_lines
+        show_separator = settings.show_separator
+        separator_width = settings.separator_width
     else:
-        title_font = _load_font(36)  # Smaller, narrower title
-        text_font = _load_font(32)
-        title_y = 40
-        item_y = 110
-        case_y = 160
-        barcode_y = 210
-        x_margin = 40
-        barcode_height = 280
-        font_size = 20
+        # Default layout heuristics
+        if height_dots <= 203:  # ~2x1
+            title_font = _load_font(24)
+            text_font = _load_font(22)
+            title_y = 10
+            item_y = 44
+            case_y = 70
+            barcode_y = 92
+            x_margin = 20
+            barcode_height = 60
+            font_size = 14
+            line_spacing = 24
+            title_max_chars = 24
+            max_title_lines = 2
+            show_separator = True
+            separator_width = 200
+        else:
+            title_font = _load_font(28)
+            text_font = _load_font(32)
+            title_y = 40
+            item_y = 110
+            case_y = 160
+            barcode_y = 210
+            x_margin = 40
+            barcode_height = 280
+            font_size = 20
+            line_spacing = 24
+            title_max_chars = 24
+            max_title_lines = 2
+            show_separator = True
+            separator_width = 200
 
     # Text with multi-line title support
-    title_lines = wrap_text(title or "", 60)  # Increased for narrower font
+    title_lines = wrap_text(title or "", title_max_chars, max_title_lines)
     for i, title_line in enumerate(title_lines):
-        y_pos = title_y + (i * 24)
+        y_pos = title_y + (i * line_spacing)
         draw.text((x_margin, y_pos), title_line, fill=0, font=title_font)
     
-    # Add separator line after title (moved down further to avoid underlining text)
-    if title_lines and title_lines[0]:
-        separator_y = title_y + (len(title_lines) * 24) + 24
-        draw.line([(x_margin, separator_y), (x_margin + 200, separator_y)], fill=0, width=2)
+    # Add separator line after title (if enabled)
+    if show_separator and title_lines and title_lines[0]:
+        separator_y = title_y + (len(title_lines) * line_spacing) + line_spacing
+        draw.line([(x_margin, separator_y), (x_margin + separator_width, separator_y)], fill=0, width=2)
     
     # Adjust positions for multi-line title
-    item_y_adjusted = item_y + (len(title_lines) - 1) * 24
-    if title_lines and title_lines[0]:
-        item_y_adjusted += 24  # Extra space after separator
+    item_y_adjusted = item_y + (len(title_lines) - 1) * line_spacing
+    if show_separator and title_lines and title_lines[0]:
+        item_y_adjusted += line_spacing  # Extra space after separator
     draw.text((x_margin, item_y_adjusted), item_number or "", fill=0, font=text_font)
     
     if casepack:
-        case_y_adjusted = case_y + (len(title_lines) - 1) * 24
-        if title_lines and title_lines[0]:
-            case_y_adjusted += 24  # Extra space after separator
+        case_y_adjusted = case_y + (len(title_lines) - 1) * line_spacing
+        if show_separator and title_lines and title_lines[0]:
+            case_y_adjusted += line_spacing  # Extra space after separator
         draw.text((x_margin, case_y_adjusted), f"CS/PK: {casepack}", fill=0, font=text_font)
 
     # Barcode (only if UPC provided)
@@ -128,17 +162,17 @@ def render_label_preview(
                 scale = max_w / bc_img.width
                 new_size = (int(bc_img.width * scale), int(bc_img.height * scale))
                 bc_img = bc_img.resize(new_size)
-            barcode_y_adjusted = barcode_y + (len(title_lines) - 1) * 24
-            if title_lines and title_lines[0]:
-                barcode_y_adjusted += 24  # Extra space after separator
+            barcode_y_adjusted = barcode_y + (len(title_lines) - 1) * line_spacing
+            if show_separator and title_lines and title_lines[0]:
+                barcode_y_adjusted += line_spacing  # Extra space after separator
             img.paste(bc_img.convert("L"), (x_margin, barcode_y_adjusted))
         except Exception:
             logging.warning("Failed to render preview barcode", exc_info=True)
     else:
         if upc12 and upc12.strip():  # Only show message if UPC was entered but invalid
-            barcode_y_adjusted = barcode_y + (len(title_lines) - 1) * 24
-            if title_lines and title_lines[0]:
-                barcode_y_adjusted += 24  # Extra space after separator
+            barcode_y_adjusted = barcode_y + (len(title_lines) - 1) * line_spacing
+            if show_separator and title_lines and title_lines[0]:
+                barcode_y_adjusted += line_spacing  # Extra space after separator
             draw.text((x_margin, barcode_y_adjusted), "UPC preview unavailable", fill=0, font=_load_font(16))
 
     return img

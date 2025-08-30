@@ -13,6 +13,7 @@ from app.labels.sizes import LABEL_SIZES_DOTS
 from app.utils.validation import ensure_upc12, sanitize_text
 from app.utils.preview import render_label_preview, image_to_tk
 from app.utils.database import LabelDatabase
+from app.utils.settings import SettingsManager
 
 
 def setup_logging() -> None:
@@ -36,6 +37,7 @@ class PrintLabelApp(tk.Tk):
 
         self.preview_image = None
         self.db = LabelDatabase()
+        self.settings_manager = SettingsManager()
 
         self._build_ui()
         self._load_printers()
@@ -127,6 +129,9 @@ class PrintLabelApp(tk.Tk):
         # Actions
         frm_actions = ttk.Frame(self)
         frm_actions.pack(fill="x", **padding)
+
+        self.btn_settings = ttk.Button(frm_actions, text="Settings", command=self._open_settings)
+        self.btn_settings.pack(side="left")
 
         self.btn_print = ttk.Button(frm_actions, text="Print", command=self._on_print)
         self.btn_print.pack(side="right")
@@ -291,6 +296,10 @@ class PrintLabelApp(tk.Tk):
             casepack = self.txt_case.get().strip()
             upc12 = ensure_upc12(self.txt_upc.get().strip() or "") or ""
 
+            # Get current settings for preview
+            printer_name = self.cbo_printers.get()
+            settings = self.settings_manager.get_settings(printer_name, size_key) if printer_name else None
+            
             img = render_label_preview(
                 width_dots=dims["width_dots"],
                 height_dots=dims["height_dots"],
@@ -298,6 +307,7 @@ class PrintLabelApp(tk.Tk):
                 item_number=item_number,
                 casepack=casepack,
                 upc12=upc12,
+                settings=settings,
             )
 
             # Scale to fit canvas while preserving aspect
@@ -341,6 +351,9 @@ class PrintLabelApp(tk.Tk):
         lang = self._resolve_language(printer_name)
 
         try:
+            # Get current settings for printing
+            settings = self.settings_manager.get_settings(printer_name, size_key)
+            
             if lang == "EPL":
                 payload = build_epl_label(
                     size_key=size_key,
@@ -349,6 +362,7 @@ class PrintLabelApp(tk.Tk):
                     title=title,
                     casepack=casepack,
                     copies=copies,
+                    settings=settings,
                 )
             else:
                 payload = build_zpl_label(
@@ -377,6 +391,38 @@ class PrintLabelApp(tk.Tk):
         except Exception as ex:
             logging.exception("Failed to print")
             messagebox.showerror("Error", f"Failed to print: {ex}")
+
+    def _open_settings(self):
+        """Open the settings dialog."""
+        try:
+            from app.ui.settings_dialog import SettingsDialog
+            
+            printer_name = self.cbo_printers.get()
+            if not printer_name:
+                messagebox.showwarning("Settings", "Please select a printer first.")
+                return
+            
+            size_key = self.cbo_size.get()
+            if not size_key:
+                messagebox.showwarning("Settings", "Please select a label size first.")
+                return
+            
+            # Open settings dialog
+            dialog = SettingsDialog(
+                parent=self,
+                settings_manager=self.settings_manager,
+                printer_name=printer_name,
+                label_size=size_key,
+                on_settings_changed=self._update_preview
+            )
+            dialog.show()
+            
+            # Update preview after settings change
+            self._update_preview()
+            
+        except Exception as ex:
+            logging.exception("Failed to open settings dialog")
+            messagebox.showerror("Error", f"Failed to open settings: {ex}")
 
 
 if __name__ == "__main__":
